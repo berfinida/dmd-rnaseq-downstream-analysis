@@ -5,15 +5,18 @@
 - SRA: `SRP278118`
 
 ## Raw Data Origin
-The original sequencing inputs are SRA FASTQ files (upstream layer).
+Original reads are SRA FASTQ files processed upstream.
 
-## Upstream Pipeline
-Raw FASTQ processing and matrix generation are performed in a separate repository:
+## Upstream Pipeline Repository
 - https://github.com/berfinida/pipeline
 
-## Downstream Repository Scope
-This repository consumes processed TSV outputs and provides TPM-based descriptive exploratory visualization.
+## Downstream Scope In This Repository
+This repository uses processed matrix outputs for TPM-based descriptive exploratory analysis.
 
-Files used directly by the dashboard:
+Primary files used:
 - `results/matrix/expression_matrix.tsv`
 - `results/matrix/dmd_vs_wt_summary.tsv`
+- `metadata/samples.tsv`
+
+Optional annotation file:
+- `annotation/transcript_to_gene_symbol.tsv`

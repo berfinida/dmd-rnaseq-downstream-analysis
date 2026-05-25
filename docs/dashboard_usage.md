@@ -1,24 +1,25 @@
 # Dashboard Usage
 
-## Start the App
+## Run
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Dashboard Sections
-- Overview & Data Provenance
-- Data Quality & Context
-- Transcript-Level Explorer
-- Top Transcript Explorer
-- PCA (Sample-Level Exploration)
-- Figure Gallery
-- Reproducibility
-- Limitations
+## Key Features
+- Optional upload mode for `expression_matrix.tsv`
+- Transcript-level explorer by Ensembl transcript ID
+- Top transcript sorting and TSV export
+- Volcano-like, heatmap, and PCA exploratory views
+- Optional annotation support (if mapping file exists)
 
-## Input Files
-- `results/matrix/expression_matrix.tsv`
-- `results/matrix/dmd_vs_wt_summary.tsv`
+## Upload Validation Requirements
+Uploaded matrix must include:
+- `Name`
+- `DMD1`
+- `DMD2`
+- `WT1`
+- `WT2`
 
-## Scientific Scope Note
-This dashboard visualizes TPM-based descriptive summaries and does not perform formal statistical differential expression testing.
+## Scientific Scope
+Dashboard outputs are descriptive and exploratory (TPM-based), not formal inferential differential expression analysis.

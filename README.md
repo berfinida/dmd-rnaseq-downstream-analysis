@@ -1,41 +1,80 @@
 # dmd-rnaseq-downstream-analysis
 
-![Python](https://img.shields.io/badge/Python-3.x-blue)
-![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B)
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![Status](https://img.shields.io/badge/Status-Portfolio%20Project-success)
-
-A reproducible computational biology project for **TPM-based descriptive exploratory** transcriptomics visualization in a DMD vs WT context.
+A scientifically cautious, reproducible transcriptomics explorer focused on **descriptive, exploratory, TPM-based** analysis.
 
 ## Live Demo
-- Streamlit Live Demo: https://dmd-rnaseq-downstream-analysis-eipcctanb8evu3u57frpva.streamlit.app
+- https://dmd-rnaseq-downstream-analysis-eipcctanb8evu3u57frpva.streamlit.app
+
+## Original Pipeline
+- https://github.com/berfinida/pipeline
 
 ## Dataset Provenance
-- Source dataset accession: `GSE156496` / `SRP278118`
+- Source dataset: `GSE156496 / SRP278118`
 - Original raw data: SRA FASTQ files
-- Upstream processing pipeline (separate repo): https://github.com/berfinida/pipeline
-- This repository consumes processed outputs:
-  - `results/matrix/expression_matrix.tsv`
-  - `results/matrix/dmd_vs_wt_summary.tsv`
+- This repository uses processed TSV outputs from the upstream pipeline.
 
-## Scientific Scope
-This repository is for descriptive exploratory analysis.
-- It does **not** perform formal differential expression statistics.
-- It does **not** compute p-values or FDR.
-- It does **not** provide clinical interpretation.
+## Input Files
+- `results/matrix/expression_matrix.tsv`
+- `results/matrix/dmd_vs_wt_summary.tsv`
+- `metadata/samples.tsv`
+- Optional: `annotation/transcript_to_gene_symbol.tsv`
+
+## Interactive Upload Mode
+The dashboard supports optional upload of `expression_matrix.tsv`.
+
+Required columns:
+- `Name`, `DMD1`, `DMD2`, `WT1`, `WT2`
+
+For uploaded matrices, the app recomputes:
+- `DMD_mean_TPM`
+- `WT_mean_TPM`
+- `log2FC = log2((DMD_mean_TPM + 1)/(WT_mean_TPM + 1))`
+
+If upload is invalid, the app shows a clear validation error and keeps default data.
+
+## Optional Annotation Support
+If `annotation/transcript_to_gene_symbol.tsv` exists with columns:
+- `transcript_id`
+- `gene_symbol`
+
+the app merges available gene symbols for display. If absent/invalid, Ensembl transcript IDs remain in use.
 
 ## App Features
-Main app: `app.py`
+- Data provenance panel
+- Data quality/context metrics
+- Transcript-level explorer
+- Top transcript explorer with multiple sort modes
+- Exportable TSV outputs:
+  - filtered table
+  - top upregulated
+  - top downregulated
+  - current descriptive summary
+- Volcano-like exploratory plot
+- Heatmap explorer
+- PCA sample-level exploratory view
+- Static figure gallery
+- Reproducibility and limitations sections
 
-- Data provenance and project context panel
-- Transcript-level explorer by Ensembl transcript ID
-- TPM display across `DMD1`, `DMD2`, `WT1`, `WT2`
-- Summary display for `DMD_mean_TPM`, `WT_mean_TPM`, and `log2FC`
-- Top transcript explorer with multiple real sort modes
-- Download button for filtered top transcript tables
-- Sample-level PCA on `log2(TPM + 1)`
-- Figure gallery for generated static plots
-- Reproducibility and limitations sections inside the dashboard
+## Exportable Summary Report
+Script:
+- `downstream_analysis/export_report_summary.py`
+
+Output:
+- `outputs/report_summary.md`
+
+Report includes dataset context, transcript/sample counts, top 10 up/down transcripts, limitations, and figure paths.
+
+## Metadata
+Sample metadata is stored in:
+- `metadata/samples.tsv`
+
+The app uses this file for group labels where available.
+
+## Future Pathway Enrichment
+Pathway enrichment is **not currently implemented**.
+
+See plan:
+- `docs/pathway_enrichment_plan.md`
 
 ## Reproducibility
 ```bash
@@ -43,21 +82,17 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Figures
-- `downstream_analysis/figures/volcano_like_plot.png`
-- `downstream_analysis/figures/top_transcripts_heatmap.png`
-- `downstream_analysis/figures/pca_plot.png`
-- `downstream_analysis/figures/summary_panel.png`
+## Scientific Limitations
+- Small sample size
+- TPM-based descriptive comparison
+- No p-values/FDR
+- No formal differential expression statistics in this repo
+- No pathway enrichment results currently implemented
+- Not for clinical interpretation
 
 ## Documentation
 - [docs/data_provenance.md](docs/data_provenance.md)
-- [docs/dashboard_usage.md](docs/dashboard_usage.md)
 - [docs/scientific_limitations.md](docs/scientific_limitations.md)
-- [docs/project_architecture.md](docs/project_architecture.md)
-- [docs/figure_interpretation.md](docs/figure_interpretation.md)
-
-## Annotation Note
-If gene-symbol annotation is unavailable, Ensembl transcript IDs are shown. Gene-symbol labeling requires an external mapping file (for example `annotation/transcript_to_gene_symbol.tsv`).
-
-## Not a Formal DE Workflow
-This project remains a data-grounded exploratory visualization layer and should not be interpreted as formal inferential differential expression analysis.
+- [docs/dashboard_usage.md](docs/dashboard_usage.md)
+- [docs/pathway_enrichment_plan.md](docs/pathway_enrichment_plan.md)
+- [docs/annotation.md](docs/annotation.md)
