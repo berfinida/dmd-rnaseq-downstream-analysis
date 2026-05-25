@@ -4,5 +4,10 @@ channels:
 dependencies:
   - python=3.11
   - pip
-  - pip:
-      - -r requirements.txt
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - streamlit
+  - plotly
