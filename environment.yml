@@ -1,0 +1,12 @@
+name: dmd-downstream
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - streamlit
+  - plotly

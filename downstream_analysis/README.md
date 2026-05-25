@@ -1,25 +1,30 @@
-# Downstream Exploratory Analysis
+# Downstream Analysis Module
 
-## Purpose
-This module provides descriptive downstream exploratory visualizations from TPM-derived transcript expression summaries in a DMD vs WT comparison.
-
-## Input Files
-- `results/matrix/expression_matrix.tsv`
-- `results/matrix/dmd_vs_wt_summary.tsv`
+Exploratory transcriptomics visualization scripts for DMD vs WT RNA-seq TPM outputs.
 
 ## Scripts
-- `plot_volcano_like.py`: descriptive volcano-like scatter using `log2FC` and `abs(log2FC)`
-- `plot_heatmap.py`: heatmap of top 20 transcripts by absolute `log2FC` across `DMD1`, `DMD2`, `WT1`, `WT2`
+- `plot_volcano_like.py`: descriptive volcano-like scatter (`log2FC` vs `abs(log2FC)`)
+- `plot_heatmap.py`: top-transcript heatmap from `log2(TPM + 1)` values
+- `plot_pca.py`: PCA projection of samples (`DMD1`, `DMD2`, `WT1`, `WT2`)
+- `annotate_transcripts.py`: optional transcript-to-gene-symbol merge helper
+
+## Annotation Behavior
+If `annotation/transcript_to_gene_symbol.tsv` exists with columns
+`transcript_id` and `gene_symbol`, annotation output is written to:
+
+- `results/matrix/dmd_vs_wt_summary_annotated.tsv`
+
+If the mapping file is missing, the script exits without inventing annotations.
 
 ## Run
 ```bash
+python downstream_analysis/annotate_transcripts.py
 python downstream_analysis/plot_volcano_like.py
 python downstream_analysis/plot_heatmap.py
+python downstream_analysis/plot_pca.py
 ```
 
-## Output Figures
+## Outputs
 - `downstream_analysis/figures/volcano_like_plot.png`
 - `downstream_analysis/figures/top_transcripts_heatmap.png`
-
-## Important Note
-This analysis is descriptive and exploratory. It is not a formal statistical differential expression analysis because no p-values or FDR values were calculated.
+- `downstream_analysis/figures/pca_plot.png`

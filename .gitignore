@@ -1,3 +1,31 @@
+# OS / editor
 .DS_Store
+.ipynb_checkpoints/
+
+# Python caches
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local plotting cache
+.matplotlib/
+
+# Large raw data and upstream artifacts (not part of this downstream repo)
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+work/
+**/work/
+refs/salmon_index/
+**/salmon_index/
+
+# Keep generated figures tracked intentionally

@@ -1,0 +1,1 @@
+Built a Python-based downstream exploratory transcriptomics analysis project using outputs from a Nextflow RNA-seq pipeline. Generated volcano-like plots, heatmaps, PCA visualization, and summary panels from DMD vs WT mouse RNA-seq expression data.

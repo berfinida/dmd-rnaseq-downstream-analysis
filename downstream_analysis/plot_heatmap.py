@@ -18,6 +18,9 @@ def main() -> None:
     project_root = Path(__file__).resolve().parents[1]
     matrix_path = project_root / "results" / "matrix" / "expression_matrix.tsv"
     summary_path = project_root / "results" / "matrix" / "dmd_vs_wt_summary.tsv"
+    annotated_summary_path = (
+        project_root / "results" / "matrix" / "dmd_vs_wt_summary_annotated.tsv"
+    )
     output_dir = project_root / "downstream_analysis" / "figures"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "top_transcripts_heatmap.png"
@@ -25,7 +28,8 @@ def main() -> None:
     sample_cols = ["DMD1", "DMD2", "WT1", "WT2"]
 
     expr = pd.read_csv(matrix_path, sep="\t")
-    summary = pd.read_csv(summary_path, sep="\t")
+    summary_source = annotated_summary_path if annotated_summary_path.exists() else summary_path
+    summary = pd.read_csv(summary_source, sep="\t")
 
     if "Name" not in expr.columns:
         raise ValueError("Missing 'Name' in expression matrix")
@@ -49,6 +53,21 @@ def main() -> None:
     log_tpm = np.log2(filtered[sample_cols] + 1)
     scaled = zscore_rows(log_tpm).fillna(0)
 
+    if "gene_symbol" in summary.columns:
+        symbol_map = (
+            summary[["Name", "gene_symbol"]]
+            .drop_duplicates(subset=["Name"])
+            .set_index("Name")["gene_symbol"]
+        )
+        labels = []
+        for transcript_id in scaled.index:
+            symbol = symbol_map.get(transcript_id, "")
+            if pd.notna(symbol) and str(symbol).strip():
+                labels.append(f"{symbol} ({transcript_id})")
+            else:
+                labels.append(transcript_id)
+        scaled.index = labels
+
     plt.style.use("seaborn-v0_8-white")
     fig, ax = plt.subplots(figsize=(8, 10), dpi=150)
     sns.heatmap(
@@ -70,6 +89,7 @@ def main() -> None:
     plt.close(fig)
 
     print(f"Saved: {output_path}")
+    print(f"Summary source: {summary_source}")
 
 
 if __name__ == "__main__":

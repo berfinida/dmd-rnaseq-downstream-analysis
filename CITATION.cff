@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: dmd-rnaseq-downstream-analysis
+message: "If you use this project, please cite it using this metadata."
+authors:
+  - family-names: Ozturk
+    given-names: Berfin Nida
+repository-code: "https://github.com/berfinida/dmd-rnaseq-downstream-analysis"
+license: MIT
