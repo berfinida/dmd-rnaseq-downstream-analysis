@@ -1,230 +1,297 @@
 #!/usr/bin/env python3
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
+from sklearn.decomposition import PCA
 
 SAMPLE_COLS = ["DMD1", "DMD2", "WT1", "WT2"]
+GROUP_MAP = {"DMD1": "DMD", "DMD2": "DMD", "WT1": "WT", "WT2": "WT"}
 
 
 def load_data(project_root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     expr_path = project_root / "results" / "matrix" / "expression_matrix.tsv"
     summary_path = project_root / "results" / "matrix" / "dmd_vs_wt_summary.tsv"
-
     expr = pd.read_csv(expr_path, sep="\t")
     summary = pd.read_csv(summary_path, sep="\t")
     return expr, summary
 
 
-def build_filtered_table(summary: pd.DataFrame, min_abs_log2fc: float, direction: str) -> pd.DataFrame:
-    table_df = summary.copy()
-    table_df["abs_log2FC"] = table_df["log2FC"].abs()
-    table_df = table_df[table_df["abs_log2FC"] >= min_abs_log2fc]
-
-    if direction == "upregulated":
-        table_df = table_df[table_df["log2FC"] > 0].sort_values("log2FC", ascending=False)
-    elif direction == "downregulated":
-        table_df = table_df[table_df["log2FC"] < 0].sort_values("log2FC", ascending=True)
-    else:
-        table_df = table_df.sort_values("abs_log2FC", ascending=False)
-
-    return table_df
+def run_pca(expr: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray]:
+    log_expr = np.log2(expr[SAMPLE_COLS] + 1)
+    x = log_expr.T.values
+    pca = PCA(n_components=2, random_state=42)
+    pcs = pca.fit_transform(x)
+    explained = pca.explained_variance_ratio_ * 100
+    pca_df = pd.DataFrame(
+        {
+            "sample": SAMPLE_COLS,
+            "group": [GROUP_MAP[s] for s in SAMPLE_COLS],
+            "PC1": pcs[:, 0],
+            "PC2": pcs[:, 1],
+        }
+    )
+    return pca_df, explained
 
 
 def main() -> None:
-    st.set_page_config(
-        page_title="DMD vs WT Transcriptomics Explorer",
-        page_icon="🧬",
-        layout="wide",
-    )
+    st.set_page_config(page_title="DMD vs WT Transcriptomics Explorer", page_icon="🧬", layout="wide")
 
     project_root = Path(__file__).resolve().parent
     expr, summary = load_data(project_root)
 
-    if "log2FC" not in summary.columns or "Name" not in summary.columns:
-        st.error("Summary file must include 'Name' and 'log2FC' columns.")
+    required_expr = {"Name", *SAMPLE_COLS}
+    required_summary = {"Name", "DMD_mean_TPM", "WT_mean_TPM", "log2FC"}
+    if not required_expr.issubset(set(expr.columns)):
+        st.error("Expression matrix is missing required columns.")
+        return
+    if not required_summary.issubset(set(summary.columns)):
+        st.error("Summary table is missing required columns.")
         return
 
     st.title("DMD vs WT Transcriptomics Explorer")
-    st.caption(
-        "This app visualizes TPM-based descriptive summaries and does not perform formal statistical differential expression testing."
+    st.info(
+        "This dashboard is for TPM-based descriptive exploratory analysis. "
+        "It does not perform formal statistical differential expression testing."
     )
 
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio(
-        "Go to",
+    section = st.sidebar.radio(
+        "Go to section",
         [
-            "Overview",
-            "Transcript Explorer",
-            "Top Transcript Tables",
-            "Interactive Charts",
+            "Overview & Data Provenance",
+            "Data Quality & Context",
+            "Transcript-Level Explorer",
+            "Top Transcript Explorer",
+            "PCA (Sample-Level Exploration)",
             "Figure Gallery",
+            "Reproducibility",
+            "Limitations",
         ],
     )
 
-    st.sidebar.header("Filters")
-    min_abs_log2fc = st.sidebar.slider(
-        "Minimum absolute log2FC", min_value=0.0, max_value=10.0, value=2.0, step=0.1
-    )
-    top_n = st.sidebar.slider("Top N transcripts", min_value=5, max_value=100, value=20, step=5)
-    direction = st.sidebar.selectbox(
-        "Direction", options=["upregulated", "downregulated", "both"], index=2
-    )
+    st.sidebar.header("Top-Table Filters")
+    min_abs_log2fc = st.sidebar.slider("Minimum absolute log2FC", 0.0, 10.0, 2.0, 0.1)
+    top_n = st.sidebar.slider("Top N", 5, 200, 25, 5)
 
-    filtered = build_filtered_table(summary, min_abs_log2fc, direction)
-
-    if page == "Overview":
+    if section == "Overview & Data Provenance":
         st.header("Project Overview")
         st.write(
-            "Interactive exploratory dashboard for TPM-based transcript summaries across "
-            "WT1, WT2, DMD1, and DMD2 samples."
+            "This app explores transcript-level TPM summaries for DMD vs WT samples "
+            "using processed matrix outputs from an upstream RNA-seq pipeline."
         )
 
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Number of transcripts", f"{len(summary):,}")
-        col2.metric("Number of samples", str(sum(c in expr.columns for c in SAMPLE_COLS)))
-        col3.metric("Max positive log2FC", f"{summary['log2FC'].max():.3f}")
-        col4.metric("Max negative log2FC", f"{summary['log2FC'].min():.3f}")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Number of transcripts", f"{len(expr):,}")
+        c2.metric("Number of samples", str(len(SAMPLE_COLS)))
+        c3.metric("Max positive log2FC", f"{summary['log2FC'].max():.3f}")
+        c4.metric("Max negative log2FC", f"{summary['log2FC'].min():.3f}")
+
+        st.subheader("Data Provenance")
+        st.markdown(
+            "- Source dataset: `GSE156496` / `SRP278118`\n"
+            "- Original raw data: SRA FASTQ files\n"
+            "- Original pipeline: Nextflow RNA-seq pipeline (`https://github.com/berfinida/pipeline`)\n"
+            "- This app uses processed files: `results/matrix/expression_matrix.tsv` and `results/matrix/dmd_vs_wt_summary.tsv`"
+        )
+
+        st.warning(
+            "Gene-symbol annotation is not applied in this app by default. "
+            "Ensembl transcript IDs are shown unless an external transcript-to-symbol mapping is provided."
+        )
+
+    elif section == "Data Quality & Context":
+        st.header("Data Quality & Context")
+
+        missing_expr = int(expr[SAMPLE_COLS].isna().sum().sum())
+        tpm_min = float(expr[SAMPLE_COLS].min().min())
+        tpm_max = float(expr[SAMPLE_COLS].max().max())
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Matrix dimensions", f"{expr.shape[0]} x {expr.shape[1]}")
+        c2.metric("Missing TPM values", str(missing_expr))
+        c3.metric("TPM range", f"{tpm_min:.3f} to {tpm_max:.3f}")
+
+        st.markdown(
+            "**Sample names:** `DMD1`, `DMD2`, `WT1`, `WT2`  \n"
+            "**Group labels:** `DMD` = (`DMD1`, `DMD2`), `WT` = (`WT1`, `WT2`)"
+        )
 
         st.subheader("Expression Matrix Preview")
-        st.dataframe(expr.head(25), use_container_width=True)
+        st.dataframe(expr.head(30), use_container_width=True)
 
-    elif page == "Transcript Explorer":
-        st.header("Transcript Explorer")
+    elif section == "Transcript-Level Explorer":
+        st.header("Transcript-Level Explorer")
+        st.caption("Search using Ensembl transcript IDs present in the matrix.")
 
-        top_candidates = (
+        ranked_ids = (
             summary.assign(abs_log2FC=summary["log2FC"].abs())
             .sort_values("abs_log2FC", ascending=False)
-            .head(100)["Name"]
+            .head(150)["Name"]
             .astype(str)
             .tolist()
         )
 
-        transcript_query = st.text_input("Search by Ensembl transcript ID", placeholder="ENSMUST...")
-        dropdown_choice = st.selectbox("Or choose from top transcripts", options=["(none)"] + top_candidates)
+        query = st.text_input("Search by Ensembl transcript ID", placeholder="ENSMUST...")
+        drop_choice = st.selectbox("Or choose from high-contrast transcripts", ["(none)"] + ranked_ids)
+        selected = query.strip() if query.strip() else (drop_choice if drop_choice != "(none)" else None)
 
-        selected_id = transcript_query.strip() if transcript_query.strip() else None
-        if not selected_id and dropdown_choice != "(none)":
-            selected_id = dropdown_choice
+        if selected:
+            expr_hit = expr[expr["Name"].astype(str) == selected]
+            summary_hit = summary[summary["Name"].astype(str) == selected]
 
-        if selected_id:
-            expr_match = expr[expr["Name"].astype(str) == selected_id]
-            summary_match = summary[summary["Name"].astype(str) == selected_id]
-
-            if expr_match.empty:
-                st.warning("Transcript ID not found.")
+            if expr_hit.empty:
+                st.error("Selected transcript ID was not found in the expression matrix.")
             else:
-                st.subheader(f"Selected transcript: {selected_id}")
-                tpm_vals = expr_match.iloc[0]
-                available_samples = [c for c in SAMPLE_COLS if c in expr_match.columns]
+                st.subheader(f"Transcript: {selected}")
+                st.dataframe(expr_hit[["Name", *SAMPLE_COLS]], use_container_width=True)
 
-                show_cols = ["Name", *available_samples]
-                st.dataframe(expr_match[show_cols], use_container_width=True)
+                if summary_hit.empty:
+                    st.warning("Transcript was found in expression matrix but not in summary table.")
+                else:
+                    st.dataframe(
+                        summary_hit[["Name", "DMD_mean_TPM", "WT_mean_TPM", "log2FC"]],
+                        use_container_width=True,
+                    )
 
-                if not summary_match.empty:
-                    cols = [c for c in ["Name", "DMD_mean_TPM", "WT_mean_TPM", "log2FC"] if c in summary_match.columns]
-                    st.dataframe(summary_match[cols], use_container_width=True)
-
+                vals = expr_hit.iloc[0]
                 plot_df = pd.DataFrame(
                     {
-                        "sample": available_samples,
-                        "TPM": [float(tpm_vals[s]) for s in available_samples],
+                        "sample": SAMPLE_COLS,
+                        "TPM": [float(vals[s]) for s in SAMPLE_COLS],
+                        "group": [GROUP_MAP[s] for s in SAMPLE_COLS],
                     }
                 )
-                plot_df["group"] = plot_df["sample"].str.extract(r"(DMD|WT)")
-
-                fig_line = px.line(
+                fig = px.bar(
                     plot_df,
                     x="sample",
                     y="TPM",
-                    markers=True,
                     color="group",
                     title="Selected transcript TPM across samples",
                     color_discrete_map={"DMD": "#D1495B", "WT": "#2E86AB"},
                 )
-                st.plotly_chart(fig_line, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
 
-                fig_bar = px.bar(
-                    plot_df,
-                    x="sample",
-                    y="TPM",
-                    color="group",
-                    title="Selected transcript TPM bar chart",
-                    color_discrete_map={"DMD": "#D1495B", "WT": "#2E86AB"},
-                )
-                st.plotly_chart(fig_bar, use_container_width=True)
+    elif section == "Top Transcript Explorer":
+        st.header("Top Transcript Explorer")
+        st.caption("Sort and filter transcript-level summary values for exploratory inspection.")
 
-    elif page == "Top Transcript Tables":
-        st.header("Interactive Top Upregulated/Downregulated Table")
-        st.dataframe(filtered.head(top_n), use_container_width=True)
-
-    elif page == "Interactive Charts":
-        st.header("Interactive Charts")
-
-        volcano_df = summary.copy()
-        volcano_df["abs_log2FC"] = volcano_df["log2FC"].abs()
-        volcano_df["highlight"] = volcano_df["abs_log2FC"] >= min_abs_log2fc
-
-        fig_volcano = px.scatter(
-            volcano_df,
-            x="log2FC",
-            y="abs_log2FC",
-            color="highlight",
-            hover_data=["Name"],
-            title="Volcano-like plot (interactive)",
-            color_discrete_map={True: "#E45756", False: "#4C78A8"},
+        sort_mode = st.selectbox(
+            "Sort transcripts by",
+            [
+                "highest log2FC",
+                "lowest log2FC",
+                "highest absolute log2FC",
+                "highest DMD mean TPM",
+                "highest WT mean TPM",
+            ],
         )
-        fig_volcano.update_traces(marker=dict(size=6, opacity=0.65))
-        fig_volcano.add_vline(x=0, line_dash="dash", line_color="gray")
-        st.plotly_chart(fig_volcano, use_container_width=True)
 
-        up_df = summary[summary["log2FC"] > 0].sort_values("log2FC", ascending=False).head(top_n)
-        down_df = summary[summary["log2FC"] < 0].sort_values("log2FC", ascending=True).head(top_n)
+        table = summary.copy()
+        table["abs_log2FC"] = table["log2FC"].abs()
+        table = table[table["abs_log2FC"] >= min_abs_log2fc]
 
-        c1, c2 = st.columns(2)
-        with c1:
-            fig_up = px.bar(
-                up_df,
-                x="log2FC",
-                y="Name",
-                orientation="h",
-                title=f"Top {top_n} upregulated transcripts",
-                color_discrete_sequence=["#D1495B"],
-            )
-            fig_up.update_layout(yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_up, use_container_width=True)
+        if sort_mode == "highest log2FC":
+            table = table.sort_values("log2FC", ascending=False)
+        elif sort_mode == "lowest log2FC":
+            table = table.sort_values("log2FC", ascending=True)
+        elif sort_mode == "highest absolute log2FC":
+            table = table.sort_values("abs_log2FC", ascending=False)
+        elif sort_mode == "highest DMD mean TPM":
+            table = table.sort_values("DMD_mean_TPM", ascending=False)
+        else:
+            table = table.sort_values("WT_mean_TPM", ascending=False)
 
-        with c2:
-            fig_down = px.bar(
-                down_df,
-                x="log2FC",
-                y="Name",
-                orientation="h",
-                title=f"Top {top_n} downregulated transcripts",
-                color_discrete_sequence=["#2E86AB"],
-            )
-            fig_down.update_layout(yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_down, use_container_width=True)
+        top_table = table.head(top_n)
+        st.dataframe(top_table, use_container_width=True)
+        st.download_button(
+            "Download filtered table (TSV)",
+            data=top_table.to_csv(sep="\t", index=False),
+            file_name="top_transcript_explorer.tsv",
+            mime="text/tab-separated-values",
+        )
 
-    elif page == "Figure Gallery":
+    elif section == "PCA (Sample-Level Exploration)":
+        st.header("PCA (Sample-Level Exploratory Visualization)")
+        st.markdown(
+            "PCA is computed on `log2(TPM + 1)` transformed transcript matrix with samples as observations. "
+            "This is a qualitative sample-level view and should not be overinterpreted given the small sample size."
+        )
+
+        pca_df, explained = run_pca(expr)
+        fig = px.scatter(
+            pca_df,
+            x="PC1",
+            y="PC2",
+            color="group",
+            text="sample",
+            title="Sample-level PCA (DMD vs WT)",
+            color_discrete_map={"DMD": "#D1495B", "WT": "#2E86AB"},
+        )
+        fig.update_traces(textposition="top center", marker=dict(size=13, line=dict(width=1, color="white")))
+        fig.update_layout(
+            xaxis_title=f"PC1 ({explained[0]:.2f}% variance)",
+            yaxis_title=f"PC2 ({explained[1]:.2f}% variance)",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.info("Do not treat this PCA as inferential evidence; it is an exploratory visual summary.")
+
+    elif section == "Figure Gallery":
         st.header("Figure Gallery")
         fig_dir = project_root / "downstream_analysis" / "figures"
 
-        figures = [
-            ("Volcano-like Plot", fig_dir / "volcano_like_plot.png"),
-            ("Top Transcript Heatmap", fig_dir / "top_transcripts_heatmap.png"),
-            ("PCA Plot", fig_dir / "pca_plot.png"),
-            ("Summary Panel", fig_dir / "summary_panel.png"),
+        gallery = [
+            (
+                "Volcano-like Plot",
+                fig_dir / "volcano_like_plot.png",
+                "Descriptive transcript-level contrast using log2FC magnitude (no p-values/FDR).",
+            ),
+            (
+                "Top Transcript Heatmap",
+                fig_dir / "top_transcripts_heatmap.png",
+                "Top |log2FC| transcripts with row-scaled log2(TPM + 1) across DMD/WT samples.",
+            ),
+            (
+                "PCA Plot",
+                fig_dir / "pca_plot.png",
+                "Sample-level exploratory PCA from log2(TPM + 1) transformed matrix.",
+            ),
+            (
+                "Summary Panel",
+                fig_dir / "summary_panel.png",
+                "Combined visual overview (volcano-like, PCA, and top transcript bars).",
+            ),
         ]
 
-        for title, fig_path in figures:
+        for title, path, caption in gallery:
             st.subheader(title)
-            if fig_path.exists():
-                st.image(str(fig_path), use_container_width=True)
+            st.caption(caption)
+            if path.exists():
+                st.image(str(path), use_container_width=True)
             else:
-                st.info(f"Figure not found: {fig_path}")
+                st.warning(f"Missing figure: {path}")
+
+    elif section == "Reproducibility":
+        st.header("Reproducibility")
+        st.code("""pip install -r requirements.txt\nstreamlit run app.py""", language="bash")
+        st.markdown(
+            "Input files used by this app:\n"
+            "- `results/matrix/expression_matrix.tsv`\n"
+            "- `results/matrix/dmd_vs_wt_summary.tsv`"
+        )
+
+    elif section == "Limitations":
+        st.header("Scientific Limitations")
+        st.markdown(
+            "- Small sample size (2 DMD, 2 WT).\n"
+            "- TPM-based descriptive comparison only.\n"
+            "- No p-values or FDR-adjusted significance estimates.\n"
+            "- Transcript-level IDs are not gene-symbol annotated unless external mapping is provided.\n"
+            "- Not for clinical interpretation."
+        )
 
 
 if __name__ == "__main__":
