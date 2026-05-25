@@ -2,11 +2,7 @@ name: dmd-downstream
 channels:
   - conda-forge
 dependencies:
-  - python
-  - pandas
-  - numpy
-  - matplotlib
-  - seaborn
-  - scikit-learn
-  - streamlit
-  - plotly
+  - python=3.11
+  - pip
+  - pip:
+      - -r requirements.txt
